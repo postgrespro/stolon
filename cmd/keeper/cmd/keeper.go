@@ -99,6 +99,8 @@ type config struct {
 	uid                     string
 	dataDir                 string
 	debug                   bool
+	priority                int
+	prioritySpecified       bool // true iff explicitly set by user
 	pgListenAddress         string
 	pgAdvertiseAddress      string
 	pgPort                  string
@@ -143,6 +145,7 @@ func init() {
 	CmdKeeper.PersistentFlags().StringVar(&cfg.pgSUPassword, "pg-su-password", "", "postgres superuser password. Only one of --pg-su-password or --pg-su-passwordfile must be provided. Must be the same for all keepers.")
 	CmdKeeper.PersistentFlags().StringVar(&cfg.pgSUPasswordFile, "pg-su-passwordfile", "", "postgres superuser password file. Only one of --pg-su-password or --pg-su-passwordfile must be provided. Must be the same for all keepers)")
 	CmdKeeper.PersistentFlags().BoolVar(&cfg.debug, "debug", false, "enable debug logging")
+	CmdKeeper.PersistentFlags().IntVar(&cfg.priority, "priority", 0, "keeper priority, integer. Stolon will promote available keeper with higher priority than current master, if this is possible. Healthy keeper with higher priority will be elected even if current master is online. If not specified, priority is set to 0 on first keeper invocation; on subsequent invocations, last value (which could be also set with 'stolonctl setkeeperpriority') is reused.")
 
 	CmdKeeper.PersistentFlags().MarkDeprecated("id", "please use --uid")
 	CmdKeeper.PersistentFlags().MarkDeprecated("debug", "use --log-level=debug instead")
@@ -440,6 +443,8 @@ type PostgresKeeper struct {
 	pgSUPassword        string
 	pgInitialSUUsername string
 
+	priority *int // nil means not specified
+
 	sleepInterval  time.Duration
 	requestTimeout time.Duration
 
@@ -470,6 +475,10 @@ func NewPostgresKeeper(cfg *config, end chan error) (*PostgresKeeper, error) {
 		return nil, fmt.Errorf("cannot get absolute datadir path for %q: %v", cfg.dataDir, err)
 	}
 
+	var priority *int = nil
+	if cfg.prioritySpecified {
+		priority = &cfg.priority
+	}
 	p := &PostgresKeeper{
 		cfg: cfg,
 
@@ -489,6 +498,8 @@ func NewPostgresKeeper(cfg *config, end chan error) (*PostgresKeeper, error) {
 		pgSUUsername:        cfg.pgSUUsername,
 		pgSUPassword:        cfg.pgSUPassword,
 		pgInitialSUUsername: cfg.pgInitialSUUsername,
+
+		priority: priority,
 
 		sleepInterval:  cluster.DefaultSleepInterval,
 		requestTimeout: cluster.DefaultRequestTimeout,
@@ -562,6 +573,7 @@ func (p *PostgresKeeper) updateKeeperInfo() error {
 			Maj: maj,
 			Min: min,
 		},
+		Priority:      p.priority,
 		PostgresState: p.getLastPGState(),
 	}
 
@@ -1981,6 +1993,10 @@ func keeper(c *cobra.Command, args []string) {
 			log.Fatalf("provided superuser name and replication user name are the same but provided passwords are different")
 		}
 	}
+
+	// if --priority wasn't specified explictily, last value is reused, so
+	// remember it
+	cfg.prioritySpecified = c.Flags().Changed("priority")
 
 	// Open (and create if needed) the lock file.
 	// There is no need to clean up this file since we don't use the file as an actual lock. We get a lock

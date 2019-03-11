@@ -17,6 +17,7 @@ package cluster
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -549,7 +550,15 @@ func NewCluster(uid string, cs *ClusterSpec) *Cluster {
 	return c
 }
 
-type KeeperSpec struct{}
+const (
+	// special value meaning user hadn't specified priority on keeper start
+	NotSpecifiedPrioriity = math.MaxInt32
+	DefaultPriority       = 0
+)
+
+type KeeperSpec struct {
+	Priority int `json:"priority,omitempty"`
+}
 
 type KeeperStatus struct {
 	Healthy         bool      `json:"healthy,omitempty"`
@@ -574,11 +583,17 @@ type Keeper struct {
 }
 
 func NewKeeperFromKeeperInfo(ki *KeeperInfo) *Keeper {
+	priority := 0 // default value
+	if ki.Priority != nil {
+		priority = *ki.Priority
+	}
 	return &Keeper{
 		UID:        ki.UID,
 		Generation: InitialGeneration,
 		ChangeTime: time.Time{},
-		Spec:       &KeeperSpec{},
+		Spec: &KeeperSpec{
+			Priority: priority,
+		},
 		Status: KeeperStatus{
 			Healthy:         true,
 			LastHealthyTime: time.Now(),
