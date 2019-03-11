@@ -49,6 +49,9 @@ type KeeperInfo struct {
 
 	PostgresBinaryVersion PostgresBinaryVersion `json:"postgresBinaryVersion,omitempty"`
 
+	// nil means not specified
+	Priority *int `json:"priority,omitempty"`
+
 	PostgresState *PostgresState `json:"postgresState,omitempty"`
 }
 
