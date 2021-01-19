@@ -219,6 +219,7 @@ func (c *ClusterChecker) Check() error {
 
 	cdProxyCheckInterval := cd.Cluster.DefSpec().ProxyCheckInterval.Duration
 	cdProxyTimeout := cd.Cluster.DefSpec().ProxyTimeout.Duration
+	cdRequestTimeout := cd.Cluster.DefSpec().RequestTimeout.Duration
 
 	// use the greater between the current proxy timeout and the one defined in the cluster spec if they're different.
 	// in this way we're updating our proxyInfo using a timeout that is greater or equal the current active timeout timer.
@@ -226,6 +227,10 @@ func (c *ClusterChecker) Check() error {
 	proxyTimeout := c.proxyTimeout
 	if cdProxyTimeout > proxyTimeout {
 		proxyTimeout = cdProxyTimeout
+	}
+	if curRequestTimeout, err := c.e.GetRequestTimeout(); err == nil && curRequestTimeout != cdRequestTimeout && cdRequestTimeout > 0 {
+		c.e.SetRequestTimeout(cdRequestTimeout)
+		log.Infow("proxy's store requestTimeout changed", "requestTimeout", cdRequestTimeout)
 	}
 	c.configMutex.Unlock()
 
@@ -321,6 +326,8 @@ func (c *ClusterChecker) TimeoutChecker(checkOkCh chan struct{}) {
 			timeoutTimer.Stop()
 
 			c.configMutex.Lock()
+			reqTimeout, _ := c.e.GetRequestTimeout()
+			log.Debugw("current proxy timeouts:", "proxyTimeout", c.proxyTimeout, "proxyCheckInterval", c.proxyCheckInterval, "requestTimeout", reqTimeout)
 			timeoutTimer = time.NewTimer(c.proxyTimeout)
 			c.configMutex.Unlock()
 		}

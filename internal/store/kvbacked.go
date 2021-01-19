@@ -345,6 +345,21 @@ func (s *KVBackedStore) GetProxiesInfo(ctx context.Context) (cluster.ProxiesInfo
 	return psi, nil
 }
 
+func (s *KVBackedStore) GetRequestTimeout() (time.Duration, error) {
+	if i, ok := s.store.(*etcdV3Store); ok {
+		return i.requestTimeout, nil;
+	}
+	return 0, fmt.Errorf("failed to get requestTimeout");
+}
+
+func (s *KVBackedStore) SetRequestTimeout(newRequestTimeout time.Duration) error {
+	if i, ok := s.store.(*etcdV3Store); ok {
+		i.requestTimeout = newRequestTimeout;
+		return nil;
+	}
+	return fmt.Errorf("failed to set requestTimeout")
+}
+
 func NewKVBackedElection(kvStore KVStore, path, candidateUID string, timeout time.Duration) Election {
 	switch kvStore := kvStore.(type) {
 	case *libKVStore:

@@ -349,6 +349,16 @@ func (s *KubeStore) GetProxiesInfo(ctx context.Context) (cluster.ProxiesInfo, er
 	return psi, nil
 }
 
+// dummy function
+func (s *KubeStore) GetRequestTimeout() (time.Duration, error) {
+	return 0, fmt.Errorf("KubeStore GetRequestTimeout() not applicable");
+}
+
+// dummy function
+func (s *KubeStore) SetRequestTimeout(newRequestTimeout time.Duration) error {
+	return fmt.Errorf("KubeStore SetRequestTimeout() not applicable")
+}
+
 type KubeElection struct {
 	client       *kubernetes.Clientset
 	podName      string
