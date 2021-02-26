@@ -111,6 +111,11 @@ func (s *KubeStore) patchKubeStatusAnnotation(annotationData []byte) error {
 	return nil
 }
 
+// dummy
+func (s *KubeStore) PutKeeperFeedback(ctx context.Context, id string, feedback string) error {
+	return nil
+}
+
 func (s *KubeStore) AtomicPutClusterData(ctx context.Context, cd *cluster.ClusterData, previous *KVPair) (*KVPair, error) {
 	cdj, err := json.Marshal(cd)
 	if err != nil {

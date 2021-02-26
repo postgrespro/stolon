@@ -253,7 +253,7 @@ func (p *Manager) Restore(command string) error {
 	command = expand(command, p.dataDir)
 
 	if err = os.MkdirAll(p.dataDir, 0700); err != nil {
-		err = fmt.Errorf("cannot create data dir: %v", err)
+		err = fmt.Errorf("cannot create data dir '%s': %v", p.dataDir, err)
 		goto out
 	}
 	cmd = exec.Command("/bin/sh", "-c", command)
@@ -263,7 +263,7 @@ func (p *Manager) Restore(command string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err = cmd.Run(); err != nil {
-		err = fmt.Errorf("error: %v", err)
+		err = fmt.Errorf("error running DataRestoreCommand '%s': %v", command, err)
 		goto out
 	}
 	// On every error remove the dataDir, so we don't end with an half initialized database

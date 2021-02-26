@@ -41,6 +41,8 @@ type Store interface {
 	GetSentinelsInfo(ctx context.Context) (cluster.SentinelsInfo, error)
 	SetProxyInfo(ctx context.Context, pi *cluster.ProxyInfo, ttl time.Duration) error
 	GetProxiesInfo(ctx context.Context) (cluster.ProxiesInfo, error)
+
+	PutKeeperFeedback(ctx context.Context, id string, feedback string) error
 }
 
 type Election interface {

@@ -210,6 +210,10 @@ func NewKVBackedStore(kvStore KVStore, path string) *KVBackedStore {
 	}
 }
 
+func (s *KVBackedStore) PutKeeperFeedback(ctx context.Context, id string, feedback string) error {
+	return s.store.Put(ctx, id, []byte(feedback), nil)
+}
+
 func (s *KVBackedStore) AtomicPutClusterData(ctx context.Context, cd *cluster.ClusterData, previous *KVPair) (*KVPair, error) {
 	cdj, err := json.Marshal(cd)
 	if err != nil {

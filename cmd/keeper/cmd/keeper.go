@@ -1050,6 +1050,10 @@ func (p *PostgresKeeper) postgresKeeperSM(pctx context.Context) {
 	e := p.e
 	pgm := p.pgm
 
+	// substituting common logs to get feedback in recovery mode
+	host, _ := os.Hostname()
+	log := &TeeLogger{pctx : pctx, p: p, host: host, base: log.Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar() }
+
 	cd, _, err := e.GetClusterData(pctx)
 	if err != nil {
 		log.Errorw("error retrieving cluster data", zap.Error(err))
@@ -1120,7 +1124,7 @@ func (p *PostgresKeeper) postgresKeeperSM(pctx context.Context) {
 	if dbls.Initializing {
 		// If we are here this means that the db initialization or
 		// resync has failed so we have to clean up stale data
-		log.Errorw("db failed to initialize or resync")
+		log.Warnw("db failed to initialize or resync") // 'Warn' instead of 'Error' cause 'Error' will be overwritten by next "real" error
 
 		if err = pgm.StopIfStarted(true); err != nil {
 			log.Errorw("failed to stop pg instance", zap.Error(err))
@@ -1239,6 +1243,7 @@ func (p *PostgresKeeper) postgresKeeperSM(pctx context.Context) {
 				log.Errorw("failed to save db local state", zap.Error(err))
 				return
 			}
+			// after that point we'll leave "pitr mode" forever on any return, so all of them will be "fatal"!
 
 			// create postgres parameters with empty InitPGParameters
 			pgParameters = p.createPGParameters(db)
@@ -1246,16 +1251,16 @@ func (p *PostgresKeeper) postgresKeeperSM(pctx context.Context) {
 			pgm.SetParameters(pgParameters)
 
 			if err = pgm.StopIfStarted(true); err != nil {
-				log.Errorw("failed to stop pg instance", zap.Error(err))
+				log.Fatalw("failed to stop pg instance", zap.Error(err))
 				return
 			}
 			if err = pgm.RemoveAll(); err != nil {
-				log.Errorw("failed to remove the postgres data dir", zap.Error(err))
+				log.Fatalw("failed to remove the postgres data dir", zap.Error(err))
 				return
 			}
 			log.Infow("executing DataRestoreCommand")
 			if err = pgm.Restore(db.Spec.PITRConfig.DataRestoreCommand); err != nil {
-				log.Errorw("failed to restore postgres database cluster", zap.Error(err))
+				log.Fatalw("failed to restore postgres database cluster", zap.Error(err))
 				return
 			}
 
@@ -1269,40 +1274,40 @@ func (p *PostgresKeeper) postgresKeeperSM(pctx context.Context) {
 			pgm.SetRecoveryOptions(p.createRecoveryOptions(recoveryMode, standbySettings, db.Spec.PITRConfig.ArchiveRecoverySettings, db.Spec.PITRConfig.RecoveryTargetSettings))
 
 			if err = pgm.StartTmpMerged(); err != nil {
-				log.Errorw("failed to start instance", zap.Error(err))
+				log.Fatalw("failed to start instance", zap.Error(err))
 				return
 			}
 
 			if recoveryMode == pg.RecoveryModeRecovery {
 				// wait for the db having replyed all the wals
-				log.Infof("waiting for recovery to be completed")
+				log.Infof("waiting for recovery to be completed with timeout = %v", cd.Cluster.DefSpec().SyncTimeout.Duration)
 				if err = pgm.WaitRecoveryDone(cd.Cluster.DefSpec().SyncTimeout.Duration); err != nil {
-					log.Errorw("recovery not finished", zap.Error(err))
+					log.Fatalw("recovery not finished", zap.Error(err))
 					return
 				}
 				log.Infof("recovery completed")
 				pgm.SetRecoveryOptions(nil)
 			}
 			if err = pgm.WaitReady(cd.Cluster.DefSpec().SyncTimeout.Duration); err != nil {
-				log.Errorw("timeout waiting for instance to be ready", zap.Error(err))
+				log.Fatalw("timeout waiting for instance to be ready", zap.Error(err))
 				return
 			}
 
 			if db.Spec.IncludeConfig {
 				pgParameters, err = pgm.GetConfigFilePGParameters()
 				if err != nil {
-					log.Errorw("failed to retrieve postgres parameters", zap.Error(err))
+					log.Fatalw("failed to retrieve postgres parameters", zap.Error(err))
 					return
 				}
 				ndbls.InitPGParameters = pgParameters
 				if err = p.saveDBLocalState(ndbls); err != nil {
-					log.Errorw("failed to save db local state", zap.Error(err))
+					log.Fatalw("failed to save db local state", zap.Error(err))
 					return
 				}
 			}
 
 			if err = pgm.StopIfStarted(true); err != nil {
-				log.Errorw("failed to stop pg instance", zap.Error(err))
+				log.Fatalw("failed to stop pg instance", zap.Error(err))
 				return
 			}
 		case cluster.DBInitModeResync:
