@@ -387,16 +387,26 @@ func (s *Sentinel) activeProxiesInfos(cd *cluster.ClusterData, proxiesInfo clust
 }
 
 func (s *Sentinel) findInitialKeeper(cd *cluster.ClusterData) (*cluster.Keeper, error) {
+	var foundPriority int
+	foundKeepers := []string{}
+
 	if len(cd.Keepers) < 1 {
 		return nil, fmt.Errorf("no keepers registered")
 	}
-	r := s.RandFn(len(cd.Keepers))
-	keys := []string{}
 	for k := range cd.Keepers {
-		keys = append(keys, k)
+		if len(foundKeepers) == 0 { // first keeper
+			foundKeepers = append(foundKeepers, k)
+			foundPriority = cd.Keepers[k].Spec.Priority
+		} else if foundPriority == cd.Keepers[k].Spec.Priority {
+			foundKeepers = append(foundKeepers, k)
+		} else if foundPriority < cd.Keepers[k].Spec.Priority {
+			foundKeepers = []string{k}
+		}
 	}
-	sort.Strings(keys)
-	return cd.Keepers[keys[r]], nil
+
+	r := s.RandFn(len(foundKeepers))
+	sort.Strings(foundKeepers)
+	return cd.Keepers[foundKeepers[r]], nil
 }
 
 // setDBSpecFromClusterSpec updates dbSpec values with the related clusterSpec ones
