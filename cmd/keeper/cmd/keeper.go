@@ -1873,10 +1873,24 @@ func (p *PostgresKeeper) generateHBA(cd *cluster.ClusterData, db *cluster.DB, on
 			}
 			sort.Strings(addresses)
 			for _, address := range addresses {
+				var addr string
+
+				ip := net.ParseIP(address)
+				if ip == nil {
+					// DNS name
+					addr = address
+				} else if ip.To4() != nil {
+					// ip v4 address
+					addr = fmt.Sprintf("%s/32", address)
+				} else {
+					// ip v6 address
+					addr = fmt.Sprintf("%s/128", address)
+				}
+
 				computedHBA = append(
 					computedHBA,
-					fmt.Sprintf("host all %s %s/32 %s", p.pgSUUsername, address, p.pgReplAuthMethod),
-					fmt.Sprintf("host replication %s %s/32 %s", p.pgReplUsername, address, p.pgReplAuthMethod),
+					fmt.Sprintf("host all %s %s %s", p.pgSUUsername, addr, p.pgReplAuthMethod),
+					fmt.Sprintf("host replication %s %s %s", p.pgReplUsername, addr, p.pgReplAuthMethod),
 				)
 			}
 		}
